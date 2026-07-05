@@ -1,0 +1,2096 @@
+{
+  "name": "Learn workflow automation",
+  "nodes": [
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"category\": \"{{ $json.category }}\",\n  \"confidence\": \"{{ $json.confidence }}\",\n  \"reason\": \"{{ $json.reason }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -16,
+        208
+      ],
+      "id": "d0bef1f1-189f-417d-8107-6da144adfb54",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "371f1aab-a561-4ed5-a098-30b9e30cec86",
+              "leftValue": "={{ $json.validation_passed }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "638595fe-53f4-452c-a210-764b2a630965",
+              "leftValue": "={{ $json.confidence }}",
+              "rightValue": "low",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -224,
+        144
+      ],
+      "id": "13f3fdae-0643-4338-97e4-be740abfc1ac",
+      "name": "confidence check"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Original message: {{ $json.message }}\n\nFast classifier reason for uncertainty: {{ $json.reason }}\n\nPlease classify this message carefully."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "=You are a precise message classifier. A fast classifier was uncertain about this message.\n\nAnalyse the message carefully and make a final decision.\n\nReturn ONLY raw JSON, no markdown:\n\n{\n\"category\": \"<selected_category>\",\n\"confidence\": \"high\",\n\"reason\": \"one sentence\"\n}\n\nValid categories:\nbooking\n\nRules:\n\n* Choose exactly ONE category.\n* Never create a new category.\n* The category field must always contain one of the valid categories above.\n* Always return \"high\" confidence.\n* Never return \"medium\" or \"low\" confidence.\n* Do not output anything except the JSON object.\n\nMessage:\n{{ $json.message }}",
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e0c652ec-3ca1-4d0a-b4e8-cf7357753577",
+      "name": "Gemini reclassifier",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "3dMMZGOTXmbesXeK",
+          "name": "Third"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Code in JavaScript').first().json;\n\nfor (const item of items) {\n  try {\n    const text = item.json.content?.parts?.[0]?.text || \"\";\n\n    const clean = text\n      .replace(/```json/g, \"\")\n      .replace(/```/g, \"\")\n      .trim();\n\n    const result = JSON.parse(clean);\n\n      const allowed = [\"booking_request\", \"price_inquiry\", \"complaint\", \"general_question\"];\nconst category = result.category;\n\nif (!allowed.includes(category)) {\n  result.validation_passed = false;\n} else {\n  result.validation_passed = true;\n}\n\n    item.json = {\n      message: source.message,\n      category: result.category || \"general\",\n      confidence: result.confidence || \"Unknown\",\n      reason: result.reason || \"Unknown\",\n      source: \"gemini-deep\",\n      validation_passed: result.validation_passed\n    };\n\n  } catch (e) {\n    item.json = {\n      message: source.message,\n      category: \"general_question\",\n      confidence: \"low\",\n      reason: \"AI returned invalid response\",\n      source: \"gemini-fast-failed\"\n    };\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        0
+      ],
+      "id": "6482d60b-f821-48ae-b5b9-ca91dd893c59",
+      "name": "parse Gemini"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n\"status\": \"classified\",\n   \"message\": \"{{ $json.message }}\",\n  \"category\": \"{{ $json.category }}\",\n  \"confidence\": \"{{ $json.confidence }}\",\n  \"reason\": \"{{ $json.reason }}\",\n\"source\": \"{{ $json.source }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1792,
+        -176
+      ],
+      "id": "bdf948cb-ef07-47e9-ab8f-9f5c926170ed",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.message }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "=You are a strict classification engine.\n\nTask:\nClassify the input message into exactly one internal category.\n\nOutput rules:\n\n* Return ONLY valid JSON\n* No markdown\n* No explanations\n* No extra text\n* No arrays\n* No lists\n* No schema descriptions\n* Do not print the list of categories in the output\n* The \"category\" field MUST be exactly one of the valid values above\n\nOutput format:\n\n{\n\"category\": \"<selected_category>\",\n\"confidence\": \"<high|medium|low>\",\n\"reason\": \"<one short sentence>\"\n}\n\nImportant:\n\n* Choose exactly ONE category.\n* Never create a new category.\n* The category field must always be one of:\n  booking_request | price_inquiry | complaint | general_question\n* If the message does not clearly fit a category, choose general_question and set confidence to \"low\".\n* If uncertain, choose the closest valid category and reduce confidence.\n* The response must always contain a valid category from the allowed values.\n* Return JSON only.\n\nInput:\n{{ $json.message}}",
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -704,
+        144
+      ],
+      "id": "8206114d-8636-4225-ac37-6acacb20f9c6",
+      "name": "Gemini Fast Classifier",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "PaW8D7XDz22z7UjW",
+          "name": "Fourth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of items) {\n  let message = item.json.message;\n\n  message = (message || \"\").trim() || \"Unknown\";\n\n  item.json.message =\n    message.charAt(0).toUpperCase() + message.slice(1);\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        144
+      ],
+      "id": "3641a0eb-4957-4a76-9bc7-d46d3be8af91",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "39b02a06-1a21-4fed-a394-f00ab434d0f3",
+              "leftValue": "={{ $json.validation_passed }}",
+              "rightValue": "=false",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        0
+      ],
+      "id": "6e0ef2c8-1aa8-4902-99f9-6f9202f937ea",
+      "name": "validation IF"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.message }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "=You are a classification engine.\n\nClassify the provided message into exactly one valid category.\n\nAllowed category values:\nbooking_request | price_inquiry | complaint | general_question\n\nReturn ONLY a valid JSON object with this structure:\n\n{\n\"category\": \"<selected_category>\",\n\"confidence\": \"<high|medium|low>\",\n\"reason\": \"<one short sentence>\"\n}\n\nRules:\n\n* category must contain only one classification value.\n* category must be exactly one of the allowed values.\n* Never create a new category.\n* Never return an array or list.\n* Never print all available categories in the output.\n* Never explain the classification process.\n* Never output anything outside the JSON object.\n* If uncertain, choose the closest allowed category and reduce confidence.\n\nMessage:\n{{ $json.message }}",
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -128
+      ],
+      "id": "ec47a460-7f40-4030-9e08-0999b475bfe5",
+      "name": "Gemini Retry",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BhSVzTXcrCFgiBSD",
+          "name": "Second"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Code in JavaScript').first().json;\n\nlet raw_ai_response = null;\nlet resultData = null;\n\nconst allowed = [\"booking_request\", \"price_inquiry\", \"complaint\", \"general_question\"];\n\nfor (const item of items) {\n\n  let text = \"\";\n  let clean = \"\";\n\n  try {\n    text = item.json.content?.parts?.[0]?.text || \"\";\n\n    clean = text\n      .replace(/```json/g, \"\")\n      .replace(/```/g, \"\")\n      .trim();\n\n    const result = JSON.parse(clean);\n\n    const validation_passed = allowed.includes(result.category);\n\n    raw_ai_response = {\n      category: result.category || \"general\",\n      confidence: result.confidence || \"Unknown\",\n      reason: result.reason || \"Unknown\"\n    };\n\n    resultData = {\n      message: item.json.message || source.message,\n      category: result.category || \"general\",\n      confidence: result.confidence || \"Unknown\",\n      reason: result.reason || \"Unknown\",\n      source: \"gemini-deep\",\n      validation_passed\n    };\n\n  } catch (e) {\n\n    resultData = {\n      message: item.json.message || source.message,\n      category: \"general_question\",\n      confidence: \"low\",\n      reason: \"AI returned invalid response\",\n      source: \"gemini-fast-failed\",\n      validation_passed: false\n    };\n\n    raw_ai_response = {\n      category: \"general_question\",\n      confidence: \"low\",\n      reason: \"AI returned invalid response\"\n    };\n  }\n}\n\nreturn [\n  {\n    json: {\n      resultData,\n      raw_ai_response_object: raw_ai_response\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        -128
+      ],
+      "id": "325955a3-359c-47e8-a21f-89ba08a742a2",
+      "name": "Parse Retry Code"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO failed_classifications (\n  original_message,\n  original_category,\n  original_confidence,\n  original_reason,\n  original_source,\n  validation_passed,\n  raw_ai_response_object\n)\nVALUES (\n  $1,\n  $2,\n  $3,\n  $4,\n  $5,\n  $6,\n  $7::jsonb\n)\nRETURNING\n  id,\n  original_message,\n  original_category,\n  original_confidence,\n  original_reason,\n  original_source,\n  validation_passed,\n  raw_ai_response_object,\n  TO_CHAR(failed_at, 'DD/MM/YYYY') AS failed_date;",
+        "options": {
+          "queryReplacement": "={{ [\n  $json.resultData.message,\n  $json.resultData.category,\n  $json.resultData.confidence,\n  $json.resultData.reason,\n  $json.resultData.source,\n  $json.resultData.validation_passed,\n  JSON.stringify($json.raw_ai_response_object)\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1440,
+        -192
+      ],
+      "id": "53d0d803-f100-4930-9fe3-e40c26fd0db7",
+      "name": "insert to Neon",
+      "alwaysOutputData": false,
+      "credentials": {
+        "postgres": {
+          "id": "mkrGAjJdUENHiTP4",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Code in JavaScript').first().json;\n\nfor (const item of items) {\n  try {\n    const text = item.json.content?.parts?.[0]?.text || \"\";\n\n    const clean = text\n      .replace(/```json/g, \"\")\n      .replace(/```/g, \"\")\n      .trim();\n\n    const result = JSON.parse(clean);\n\n         const allowed = [\"booking_request\", \"price_inquiry\", \"complaint\", \"general_question\"];\nconst category = result.category;\n\nif (!allowed.includes(category)) {\n  result.validation_passed = false;\n} else {\n  result.validation_passed = true;\n}\n\n  const message = (source.message);\n    item.json.message = message.charAt(0).toUpperCase() + message.slice(1);\n    \n   item.json = {\n     message: message.charAt(0).toUpperCase() + message.slice(1),\n     category: result.category ?? \"general\",\n      confidence: result. confidence ?? \"low\",\n     reason:\n       (result.reason ?? \"AI returned invalid response\")\n     .trim()\n     .replace(/^./, c => c.toUpperCase()),\n     source: \"gemini-fast\",\n   validation_passed: result.validation_passed\n\n   }\n \n   \n\n    \n\n  } catch (e) {\n    item.json = {\n      ...item.json,\n      message: source.message,\n      category: \"general_question\",\n      confidence: \"low\",\n      reason: \"AI returned invalid response\",\n      source: \"gemini-fast-failed\"\n    };\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        144
+      ],
+      "id": "d077c138-3ccc-49c2-b125-3d2517b6d728",
+      "name": "parse gemini"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "53767785-1dcd-4128-a0df-6cb99c6637fd",
+              "leftValue": "={{ $json.resultData.validation_passed }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1216,
+        -128
+      ],
+      "id": "d526b705-b80f-45af-845b-a38203562558",
+      "name": "validatiom"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sourceFrom = $('Parse Retry Code').first().json.resultData;\nfor (const item of items) {\n  item.json = {\n    message: sourceFrom.message,\n    category: sourceFrom.category || \"general\",\n    confidence: sourceFrom.confidence || \"Unknown\",\n    reason: sourceFrom.reason || \"Unknown\",\n  };\n}\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -192
+      ],
+      "id": "0e6112c8-605d-4f1a-84b7-d4f835d9dc2e",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n\"status\": \"classified\",\n   \"message\": \"{{ $json.message }}\",\n  \"category\": \"{{ $json.category }}\",\n  \"confidence\": \"{{ $json.confidence }}\",\n  \"reason\": \"{{ $json.reason }}\",\n  \"source\": \"{{ $json.source }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        688,
+        96
+      ],
+      "id": "fdce6128-ae49-4693-a6df-5fe857e2f3b9",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n\"status\": \"classified\",\n   \"message\": \"{{ $json.resultData.message }}\",\n  \"category\": \"{{ $json.resultData.category }}\",\n  \"confidence\": \"{{ $json.resultData.confidence }}\",\n  \"reason\": \"{{ $json.resultData.reason }}\",\n\"source\": \"{{ $json.resultData.source }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1600,
+        80
+      ],
+      "id": "73432acc-6ad2-414a-b1a3-1bc777504dfd",
+      "name": "Respond to Webhook3"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{ \"message\": \"Hi, I'm Sarah from Bright Dental, sarah@brightdental.com, we need help automating our appointment reminders, fairly urgent.\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1072,
+        160
+      ],
+      "id": "69a269e1-fd18-4c40-9e9c-ae89e34a2781",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"sessionId\": \"session-ahmed-001\",\n  \"chatInput\": \"أحتاج تفاصيل عن الشقق المكونة من غرفتين، وما هي أوقات عملكم؟\",\n  \"name\": \"Ahmed Al Mansoori\",\n  \"email\": \"ahmed@example.com\",\n  \"phone\": \"+971501234567\",\n  \"source\": \"website_form\",\n  \"service_needed\": \"2-bedroom apartment\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        864
+      ],
+      "id": "3cdb046b-8c7b-49b2-8fc9-58ff1a725c24",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=You are a professional real estate assistant for Al Noor Real Estate Agency in Dubai.\n\nRULES YOU MUST FOLLOW WITHOUT EXCEPTION:\n1. You MUST call a tool to answer any question about properties or office hours. Never answer from memory.\n2. If a question involves price negotiations, contracts, legal matters, or complaints — say: \"This requires speaking with one of our agents directly. Would you like me to arrange that?\"\n3. After EVERY response, call the log_inquiry tool to record this interaction.\n4. If the tools return no matching data, say exactly: \"I don't have that information in our current listings. Let me connect you with an agent.\"\n5. Never make up property details, prices, or hours.\n\nTOOL SELECTION RULES:\n- Question about properties, bedrooms, price, location, features → call get_property_listings\n- Question about office hours, opening times, when you are open → call get_office_hours\n- After forming your response → always call log_inquiry"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        16,
+        864
+      ],
+      "id": "8188ed58-c80f-46ea-af0d-f347f2cef48f",
+      "name": "AI Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Returns all available property listings including type, bedrooms, price in AED, location, and features. Call this for any question about properties.",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appSgAF4v4SbBjFzp",
+          "mode": "list",
+          "cachedResultName": "Untitled Base",
+          "cachedResultUrl": "https://airtable.com/appSgAF4v4SbBjFzp"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblmBs9UEREqKgwkc",
+          "mode": "list",
+          "cachedResultName": "Properties",
+          "cachedResultUrl": "https://airtable.com/appSgAF4v4SbBjFzp/tblmBs9UEREqKgwkc"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        1152
+      ],
+      "id": "af332777-77b6-417d-b13f-14c3e5206b0c",
+      "name": "get_property_listings",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Q9H7yGe36gSdVS5n",
+          "name": "Read data"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Returns the agency's office hours for each day of the week. Call this for any question about when the office is open or available.",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appSgAF4v4SbBjFzp",
+          "mode": "list",
+          "cachedResultName": "Untitled Base",
+          "cachedResultUrl": "https://airtable.com/appSgAF4v4SbBjFzp"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblaFP72AQFBGkuo7",
+          "mode": "list",
+          "cachedResultName": "OfficeHours",
+          "cachedResultUrl": "https://airtable.com/appSgAF4v4SbBjFzp/tblaFP72AQFBGkuo7"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        1168
+      ],
+      "id": "496051e4-daf4-4430-a402-7682eb1ba1e1",
+      "name": "get_office_hours",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Q9H7yGe36gSdVS5n",
+          "name": "Read data"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableName": "n8n_chat_memory"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "position": [
+        16,
+        1152
+      ],
+      "id": "75129d4f-3e65-46ab-b976-7b59706c90f6",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "mkrGAjJdUENHiTP4",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Logs the user's message and the agent's final response to the database. Always call this exactly once, after you have formed your final answer to the customer.",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appSgAF4v4SbBjFzp",
+          "mode": "list",
+          "cachedResultName": "Untitled Base",
+          "cachedResultUrl": "https://airtable.com/appSgAF4v4SbBjFzp"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblsGifJRmFtJ0zDl",
+          "mode": "list",
+          "cachedResultName": "Inquiries",
+          "cachedResultUrl": "https://airtable.com/appSgAF4v4SbBjFzp/tblsGifJRmFtJ0zDl"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "test-session-001",
+            "user_message": "={{ $fromAI('user_message', 'The original question the customer asked') }}",
+            "agent_response": "={{ $fromAI('agent_response', 'The final answer you are giving the customer') }}",
+            "tools_used": "={{ $fromAI('tools_used', 'Comma-separated list of tool names you called to answer this, e.g. get_property_listings') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user_message",
+              "displayName": "user_message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "agent_response",
+              "displayName": "agent_response",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tools_used",
+              "displayName": "tools_used",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        1184
+      ],
+      "id": "60cc84ba-bb0b-494f-9f54-92f2c1d3a346",
+      "name": "Create a record in Airtable",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Q9H7yGe36gSdVS5n",
+          "name": "Read data"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -128,
+        1072
+      ],
+      "id": "afe0b6d5-5467-4366-9b40-c20908610618",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LaALZ0m6GNNnlLcd",
+          "name": "First"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "29c9dbd9-f3d7-4e7c-8024-e43b9aa71c3f",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1024,
+        880
+      ],
+      "id": "8c368056-2c5f-42f3-baa9-0d65a17f43a4",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of items) {\n\n  const text = item.json.output || \"\";\n\n  const clean = text\n    .replace(/```json/g, \"\")\n    .replace(/```/g, \"\")\n    .trim();\n\n  if (!clean || clean.length === 0) {\n    item.json = {\n      success: false,\n      error: \"Service temporarily unavailable\"\n    };\n    continue;\n  }\n\n  item.json = {\n    success: true,\n    response: clean\n  };\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        864
+      ],
+      "id": "12f31f4a-c802-4961-b380-87e7be1e4957",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n\"success\": {{ $json.success }},\n  \"response\": \"{{ $json.response }}\"\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1232,
+        784
+      ],
+      "id": "1c0ddb8b-4b58-46eb-8f55-f23de548cfe5",
+      "name": "Respond To Webhook (Success)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": {{ $json.success }},\n  \"error\": \"{{ $json.error }}\"\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1248,
+        1024
+      ],
+      "id": "f93e81f8-cb96-4952-8263-2ba1ef3559ca",
+      "name": "Respond To Webhook (Error)"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"name\": \"Sara Al Hashimi\",\n  \"email\": \"sara0@example.com\",\n  \"phone\": \"+971507654321\",\n  \"source\": \"website_form\",\n  \"service_needed\": \"I want to buy a villa immediately\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -976,
+        1808
+      ],
+      "id": "80d764fe-18bb-4e49-a47c-78d8e8ee9c5d",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of items) {\n\n  // ===== Name =====\n  const name = (item.json.name || \"\")\n    .trim()\n    .toLowerCase()\n    .replace(/\\b\\w/g, c => c.toUpperCase());\n\n  // ===== Email =====\n  const email = (item.json.email || \"\")\n    .trim()\n    .toLowerCase();\n\n  const emailRegex =\n    /^(?!.*\\.\\.)[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$/;\n\n  // ===== Phone Function =====\n  function normalizePhone(raw) {\n    if (!raw) return { valid: false };\n\n    let phone = raw.replace(/[^\\d+]/g, \"\")\n                   .replace(/(?!^)\\+/g, \"\");\n\n    let country = \"Unknown\";\n\n    if (phone.startsWith(\"+\")) {\n      const digits = phone.replace(/\\D/g, \"\");\n      return {\n        valid: digits.length >= 8 && digits.length <= 15,\n        phone,\n        country: \"international\"\n      };\n    }\n\n    const digits = phone.replace(/\\D/g, \"\");\n\n    if (digits.length === 9 && digits.startsWith(\"5\")) {\n      return {\n        valid: true,\n        phone: \"+971\" + digits,\n        country: \"UAE\"\n      };\n    }\n\n    return { valid: false };\n  }\n\n  // ===== APPLY PHONE =====\n  const phoneResult = normalizePhone(item.json.phone);\n\n  const source = (item.json.source || \"\").trim();\n  const serviceNeeded = (item.json.service_needed || \"\").trim();\n\n  // ==========================\n  // Validation\n  // ==========================\n\n  const missing = [];\n\n  if (!name) missing.push(\"name\");\n  if (!email) missing.push(\"email\");\n  if (!phoneResult.valid) missing.push(\"phone\");\n  if (!source) missing.push(\"source\");\n  if (!serviceNeeded) missing.push(\"service_needed\");\n\n  if (missing.length) {\n    item.json = {\n      valid: false,\n      reason: `${missing.join(\", \")} ${\n        missing.length === 1 ? \"is\" : \"are\"\n      } missing`\n    };\n    continue;\n  }\n\n  // Email validation\n  if (!emailRegex.test(email)) {\n    item.json = {\n      valid: false,\n      reason: \"email is invalid\"\n    };\n    continue;\n  }\n\n  // Success\n  item.json = {\n    valid: true,\n    name,\n    email,\n    phone: phoneResult.phone,\n    country: phoneResult.country,\n    source,\n    service_needed: serviceNeeded\n  };\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        1808
+      ],
+      "id": "401edd0d-ee5e-4826-ab47-31578394dbc4",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Classify this service request priority based on real estate intent:\n\n{{ $('Code in JavaScript4').first().json.service_needed }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "=You are a real estate lead qualification assistant.\n\nYour job is to classify the urgency and intent of a real estate service request.\n\nYou will receive ONLY one input field:\nservice_needed\n\nDo not use any other fields even if provided.\n\n---\n\nCLASSIFICATION RULES:\n\nHOT (High priority):\n- Strong intent to act immediately or soon\n- Keywords: buy, book, viewing, urgent, available now, move in, schedule visit\n- Clear purchase or booking intent\n\nWARM (Medium priority):\n- User shows interest but no urgency\n- Asking about prices, options, comparisons, or general inquiries\n\nCOLD (Low priority):\n- Vague interest or no clear intent\n- Exploratory or informational only\n\n---\n\nOUTPUT RULES:\n\n- Return ONLY valid JSON\n- No explanations outside JSON\n- No markdown\n- No extra text\n\n---\n\nOUTPUT FORMAT:\n\n{\n  \"needs_service\": true,\n  \"priority\": \"HOT | WARM | COLD\"\n\n---\n\nDECISION RULES:\n\n- If intent is unclear but related to real estate → assume WARM\n- If no real estate intent → set needs_service = false and priority = COLD\n- Always base decision ONLY on service_needed field\n\n---\n\nBe strict, consistent, and deterministic.",
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        1776
+      ],
+      "id": "f10dd834-da5c-4544-ae6f-b13a0c8eedaa",
+      "name": "Message a model1",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "PaW8D7XDz22z7UjW",
+          "name": "Fourth"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const source4 = $('Code in JavaScript4').first().json;\n\nfor (const item of items) {\n\n  try {\n    const text =\n      item.json.content?.parts?.[0]?.text || \"\";\n\n    let result;\n\n    if (text.trim().startsWith(\"{\")) {\n      const clean = text\n        .replace(/```json/g, \"\")\n        .replace(/```/g, \"\")\n        .trim();\n\n      result = JSON.parse(clean);\n    } else {\n      result = {\n        priority: \"Invalid response\",\n        needs_service: false\n      };\n    }\n\n    const now = new Date();\n    const useTime = new Intl.DateTimeFormat(\"sv-SE\", {\n  timeZone: \"Asia/Dubai\",\n  year: \"numeric\",\n  month: \"2-digit\",\n  day: \"2-digit\",\n  hour: \"2-digit\",\n  minute: \"2-digit\",\n  second: \"2-digit\",\n  hour12: false\n}).format(new Date()).replace(\" \", \"T\");\n\n   result.priority.toUpperCase();\n\n    item.json = {\n      level: result?.priority || \"Invalid response\",\n      needs_service: result?.needs_service ?? false,\n      source4,\n      useTime: useTime\n    };\n\n    if (result.priority !== \"HOT\" && result.priority !== \"WARM\" && result.priority !== \"COLD\") {\n      item.json = {\n        level: \"UNSCORED\",\n        needs_service: false,\n        gemini_failed: true,\n        source4\n      }\n    }\n\n  } catch (e) {\n    item.json = {\n      level: \"ERROR\",\n      error: e.message,\n      raw: item.json\n    };\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        1760
+      ],
+      "id": "9830dde8-de59-479d-b831-022cd3026518",
+      "name": "Recontract data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ca4cd1f7-09eb-4c75-9d64-548315148792",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -544,
+        1808
+      ],
+      "id": "3460faf7-698f-49e6-a64a-2bf5836727b6",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"valid\": \"{{ $json.valid }}\",\n  \"reason\": \"{{ $json.reason }}\"\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -368,
+        2016
+      ],
+      "id": "32670c81-eb0e-4018-bd58-40957fe0e750",
+      "name": "Respond to Webhook4"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appfq3Whh99EMsXRl",
+          "mode": "list",
+          "cachedResultName": "Data",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl56xA2706We0gcI",
+          "mode": "list",
+          "cachedResultName": "Contacts",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl/tbl56xA2706We0gcI"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "source": "={{ $json.source4.source }}",
+            "phone": "={{ $json.source4.phone }}",
+            "email": "={{ $json.source4.email }}",
+            "name": "={{ $json.source4.name }}",
+            "status": "=new",
+            "created_at": "={{ $json.useTime }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1184,
+        1776
+      ],
+      "id": "20a985c4-6ff1-4769-b820-b949252313a7",
+      "name": "create Contact",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "qfXr7bO7FYt0FmvW",
+          "name": "Data"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appfq3Whh99EMsXRl",
+          "mode": "list",
+          "cachedResultName": "Data",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblM78DMdbXnWHL7j",
+          "mode": "list",
+          "cachedResultName": "Opportunities",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl/tblM78DMdbXnWHL7j"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "opportunities": "={{ $('Recontract data').first().json.level }}",
+            "created_at": "={{ $('Recontract data').first().json.useTime }}",
+            "contact_name": "={{ $('Recontract data').first().json.source4.name }}",
+            "email": "={{ $('Recontract data').first().json.source4.email }}",
+            "pipeline_stage": "New Lead",
+            "source": "={{ $('Recontract data').first().json.source4.source }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pipeline_stage",
+              "displayName": "pipeline_stage",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "opportunities",
+              "displayName": "opportunities",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        1760
+      ],
+      "id": "be22669a-9d3c-42c9-b77e-dc8f0a0d0e4a",
+      "name": "create Opportunity",
+      "alwaysOutputData": false,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "qfXr7bO7FYt0FmvW",
+          "name": "Data"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#all-grants",
+          "mode": "name"
+        },
+        "text": "=New Lead Received\n\nName: {{ $('Recontract data').first().json.source4.name }}\nEmail: {{ $('Recontract data').first().json.source4.email }}\nPhone: {{ $('Recontract data').first().json.source4.phone }}\nService Needed: {{ $('Recontract data').first().json.source4.service_needed }}\nLead Score: {{ $('Recontract data').first().json.level }}\nSource: {{ $('Recontract data').first().json.source4.source }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1568,
+        1760
+      ],
+      "id": "ce1c8812-bb15-4132-9edd-ab267f2f1cf7",
+      "name": "Send a message",
+      "webhookId": "e3fcbdd6-47a3-4070-9431-fe4e6e559f8d",
+      "credentials": {
+        "slackApi": {
+          "id": "giMrwoqDSAd7BdjM",
+          "name": "notification"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Lead received and logged\",\n  \"name\": \"{{ $('Recontract data').first().json.source4.name }}\",\n  \"lead_score\": \"{{ $('Recontract data').first().json.level }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1760,
+        1760
+      ],
+      "id": "015953ff-7f8c-4657-86df-66957e696ff1",
+      "name": "Respond to Webhook7"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cadc3763-cff2-4d00-ae8a-f1296e748c77",
+              "leftValue": "={{ $json.gemini_failed }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        784,
+        1760
+      ],
+      "id": "e86bbc63-2f2d-451c-b087-60010b35a848",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"Lead scoring unavailable. Please try again shortly.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        1616
+      ],
+      "id": "c4dd0097-e3a1-42f6-bca0-28a7eb1d03bc",
+      "name": "Respond to Webhook8"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appfq3Whh99EMsXRl",
+          "mode": "list",
+          "cachedResultName": "Data",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl56xA2706We0gcI",
+          "mode": "list",
+          "cachedResultName": "Contacts",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl/tbl56xA2706We0gcI"
+        },
+        "filterByFormula": "={{ \"LOWER({email}) = LOWER('\" + $json.email + \"')\" }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        1792
+      ],
+      "id": "eae8c6ed-9780-4c23-aa9a-0b01800bbc7d",
+      "name": "Search records",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "qfXr7bO7FYt0FmvW",
+          "name": "Data"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"reason\": \"duplicate email\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        96,
+        1984
+      ],
+      "id": "de58b2b5-7d3a-49d2-991e-cd0a167ba2b8",
+      "name": "Respond to Webhook9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fa9fa63b-106e-4b93-aa2d-450623f5fd01",
+              "leftValue": "={{ $items()[0].json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -96,
+        1792
+      ],
+      "id": "62276a68-2ec9-4885-b139-7e1e36658fd2",
+      "name": "Check repeated email"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1896819c-5201-4aa6-bf1f-63e5d36ee073",
+              "name": "message",
+              "value": "Hi,  I'm Sarah Johnson from Bright Dental.  My email is sarahmohummad@gmail.com and my phone number is +971501234567.  We need help automating our appointment reminder system and integrating it with our CRM.  This is urgent and should be handled as soon as possible.  Our budget is 2000 USD.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2064,
+        672
+      ],
+      "id": "a69ce146-65a6-474b-8f27-992514b18cf4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.message }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "=You are an information extraction engine.\n\nExtract information from the message and return ONLY valid raw JSON.\n\nRequired fields:\n\n* company_name\n* contact_name\n* email\n* service_needed\n\nAdditional fields:\n\n* urgency_level\n\nOptional fields:\n\n* phone\n* budget_mentioned\n\nRules:\n\n1. Return ONLY raw JSON. No markdown, explanations, comments, or code fences.\n\n2. Use exactly these keys:\n   * company_name\n   * contact_name\n   * email\n   * service_needed\n   * urgency_level\n   * phone\n   * budget_mentioned\n   * missing_required_fields\n\n3. Never invent or assume information that is not explicitly stated.\n\n4. If an optional field is not mentioned, return null.\n\n5. If a required field is missing from the message, set it to null and add its key name to missing_required_fields.\n\n6. Missing values must always be null. Never use empty strings, \"unknown\", \"N/A\", or similar placeholders.\n\n7. IMPORTANT: Email validation is NOT required.\n   The email field must be extracted even if it is invalid or malformed.\n   Your task is ONLY to check whether an email exists in the text, not whether it is correctly formatted.\n\n8. urgency_level must be one of:\n   * urgent\n   * normal\n   * low\n\n9. If urgency is clearly expressed (e.g. urgent, asap, immediately, emergency, today), set urgency_level accordingly.\n\n10. If urgency is not mentioned, set:\n   \"urgency_level\": \"normal\"\n\n11. missing_required_fields must contain only:\n   * company_name\n   * contact_name\n   * email\n   * service_needed"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2480,
+        656
+      ],
+      "id": "52ead617-46be-4d57-af2c-2c3300df8abd",
+      "name": "Message a model",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VdAzQnF68uwDGqv4",
+          "name": "Unavailable"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of items) {\n  let message = item.json.message;\n\n  message = (message || \"\").trim() || \"Unknown\";\n\n  item.json.message =\n    message.charAt(0).toUpperCase() + message.slice(1);\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        672
+      ],
+      "id": "24cb346d-b349-45d1-84e2-ef255388d9a5",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of items) {\n  try {\n    const text = item.json.content?.parts?.[0]?.text || \"\";\n\n    const clean = text\n      .replace(/```json/g, \"\")\n      .replace(/```/g, \"\")\n      .trim();\n\n    const result = JSON.parse(clean);\n\n    const errors = [];\n\n    if (result.missing_required_fields?.length) {\n      errors.push(\n        `${result.missing_required_fields.join(', ')} ${\n          result.missing_required_fields.length === 1 ? 'is' : 'are'\n        } missing`\n      );\n    }\n\n    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n    if (\n      result.email !== null &&\n      !emailRegex.test(result.email)\n    ) {\n      errors.push(`Invalid email format: ${result.email}`);\n    }\n\n    if (errors.length) {\n      throw new Error(errors.join(' | '));\n    }\n\n    const output = {\n      success: true,\n      data: result\n    };\n\n    if (!result.missing_required_fields?.length) {\n      delete output.data.missing_required_fields;\n    }\n\n    item.json = output;\n\n  } catch (e) {\n    item.json = {\n      success: false,\n      error: e.message\n    };\n  }\n}\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        672
+      ],
+      "id": "c4f87623-e9aa-41f7-baba-31da385b6a04",
+      "name": "missing_required_fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0b8eb71a-2e25-48c1-bbda-4189d21c209d",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3024,
+        672
+      ],
+      "id": "e578e74d-79f7-44e5-a01b-f9bdf0a8149b",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"company_name\": \"{{ $json.data.company_name }}\",\n  \"contact_name\": \"{{ $json.data.contact_name }}\",\n  \"email\": \"{{ $json.data.email }}\",\n  \"service_needed\": \"{{ $json.data.service_needed }}\",\n  \"urgency_level\": \"{{ $json.data.urgency_level }}\",\n  \"phone\": \"{{ $json.data.phone }}\",\n  \"budget_mentioned\": \"{{ $json.data.budget_mentioned }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3328,
+        592
+      ],
+      "id": "a797ea23-3356-41da-aced-305b156c8fce",
+      "name": "Respond to Webhook5"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": {{ $json.success }},\n  \"error\": \"{{ $json.error }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3296,
+        832
+      ],
+      "id": "163e91d1-cd40-41c9-902e-c96789a3c54e",
+      "name": "Respond to Webhook6"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        864
+      ],
+      "id": "e84e221f-d037-4315-b181-bc3b7bb55871",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appfq3Whh99EMsXRl",
+          "mode": "list",
+          "cachedResultName": "Data",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblt8sAkokn7dbuyb",
+          "mode": "list",
+          "cachedResultName": "Clients",
+          "cachedResultUrl": "https://airtable.com/appfq3Whh99EMsXRl/tblt8sAkokn7dbuyb"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "website_form",
+                  "value": "website_form"
+                },
+                {
+                  "name": "whatsapp",
+                  "value": "whatsapp"
+                },
+                {
+                  "name": "direct",
+                  "value": "direct"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Service_Needed",
+              "displayName": "Service_Needed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created_At",
+              "displayName": "Created_At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Inquiries",
+              "displayName": "Inquiries",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        864
+      ],
+      "id": "c503cc00-64f0-4eda-bf5c-72a870c8de1b",
+      "name": "AI agent data",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "qfXr7bO7FYt0FmvW",
+          "name": "Data"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "confidence check": {
+      "main": [
+        [
+          {
+            "node": "Gemini reclassifier",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini reclassifier": {
+      "main": [
+        [
+          {
+            "node": "parse Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse Gemini": {
+      "main": [
+        [
+          {
+            "node": "validation IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Fast Classifier": {
+      "main": [
+        [
+          {
+            "node": "parse gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Gemini Fast Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validation IF": {
+      "main": [
+        [
+          {
+            "node": "Gemini Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Retry": {
+      "main": [
+        [
+          {
+            "node": "Parse Retry Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Retry Code": {
+      "main": [
+        [
+          {
+            "node": "validatiom",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert to Neon": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse gemini": {
+      "main": [
+        [
+          {
+            "node": "confidence check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validatiom": {
+      "main": [
+        [
+          {
+            "node": "insert to Neon",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_property_listings": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_office_hours": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "AI agent data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a record in Airtable": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Respond To Webhook (Success)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond To Webhook (Error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Recontract data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recontract data": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create Contact": {
+      "main": [
+        [
+          {
+            "node": "create Opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create Opportunity": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "create Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "Check repeated email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check repeated email": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "missing_required_fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "missing_required_fields": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI agent data": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8319fc47-f371-4eec-b940-b19346ecf5c7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a6a6d8b6d7820a0c8851748fe50daf3a11fadbbfbb8c5d9708a140ffa762e17"
+  },
+  "nodeGroups": [],
+  "id": "6A6n1mqLIXoLhkpp",
+  "tags": []
+}
