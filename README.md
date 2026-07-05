@@ -12,19 +12,19 @@ Drop files into these folders. The README never needs editing when you add somet
 
 ```
 n8n-automation-workflows/
-├── learning-workflows/          ← Workflows from Phases 1–6 (import → study → modify)
+├── learning-workflows/          , Workflows from Phases 1–6 (import → study → modify)
 │   ├── phase-01-foundation/
 │   ├── phase-02-ai-integration/
 │   ├── phase-03-whatsapp-agent/
 │   └── phase-04-voice-ai/
 │
-├── schemas/                     ← SQL files for Supabase/PostgreSQL tables
+├── schemas/                     , SQL files for Supabase/PostgreSQL tables
 │
-├── boilerplates/                ← Empty workflow skeletons (sub-workflows, error handlers)
+├── boilerplates/                , Empty workflow skeletons (sub-workflows, error handlers)
 │
-├── config-templates/            ← CSV, JSON, and environment variable templates
+├── config-templates/            , CSV, JSON, and environment variable templates
 │
-└── docs/                        ← Render deployment guides, naming convention cheatsheets
+└── docs/                        , Render deployment guides, naming convention cheatsheets
 ```
 
 > **Portfolio Projects (Phase 7) and Capstone Projects (Phase 8) are NOT stored here.**  
